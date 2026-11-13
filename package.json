@@ -1,0 +1,15 @@
+{
+  "name": "pi-cache-warm-decay",
+  "version": "0.1.0",
+  "description": "Pi extension: decaying, telemetry-calibrated continuation probability for idle prompt-cache warming",
+  "keywords": ["pi-package", "pi-extension", "cache", "prompt-cache"],
+  "license": "MIT",
+  "author": "Garrick Aden-Buie",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gadenbuie/pi-cache-warm-decay.git"
+  },
+  "pi": {
+    "extensions": ["./extensions/cache-warm-decay.ts"]
+  }
+}
