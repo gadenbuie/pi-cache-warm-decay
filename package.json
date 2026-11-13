@@ -1,6 +1,7 @@
 {
   "name": "pi-cache-warm-decay",
   "version": "0.1.0",
+  "type": "module",
   "description": "Pi extension: decaying, telemetry-calibrated continuation probability for idle prompt-cache warming",
   "keywords": ["pi-package", "pi-extension", "cache", "prompt-cache"],
   "license": "MIT",
