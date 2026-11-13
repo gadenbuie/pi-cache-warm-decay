@@ -284,7 +284,7 @@ export default function cacheWarmDecay(pi: ExtensionAPI) {
 	let decisionsSinceSettle = 0;
 	let lastAction: string | null = null;
 	let userInputSeen = false;
-	let lastCtx: any;
+	const unsubscribes: Array<() => void> = [];
 
 	const flushPending = (returnedAt: number | null, censored?: string) => {
 		const s = loadSettings();
@@ -337,17 +337,21 @@ export default function cacheWarmDecay(pi: ExtensionAPI) {
 			.map((t) => t.match),
 	);
 	for (const name of eventNames) {
-		pi.events.on(name, (payload: any) => {
+		const off = pi.events.on(name, (payload: any) => {
 			for (const t of effectiveTrackers(loadSettings())) {
 				if (t.source !== "event" || t.match !== name) continue;
 				const r = extractId(t, payload, "");
 				if (r.matched) apply(t, r.id);
 			}
 		});
+		if (typeof off === "function") unsubscribes.push(off);
 	}
-	pi.events.on("subagents:disposed", () => {
-		for (const [k, v] of running) if (v.group === "subagents") running.delete(k);
-	});
+	{
+		const off = pi.events.on("subagents:disposed", () => {
+			for (const [k, v] of running) if (v.group === "subagents") running.delete(k);
+		});
+		if (typeof off === "function") unsubscribes.push(off);
+	}
 
 	pi.on("tool_result", (event: any) => {
 		const text = textOf(event.content);
@@ -378,11 +382,15 @@ export default function cacheWarmDecay(pi: ExtensionAPI) {
 		pending = [];
 		decisionsSinceSettle = 0;
 		lastAction = null;
-		lastCtx = ctx;
 		loadSettings(); // materialize settings.json on first run
 	});
 
-	pi.on("session_shutdown", () => flushPending(null, "shutdown"));
+	pi.on("session_shutdown", () => {
+		flushPending(null, "shutdown");
+		// pi.events is shared across reloads: drop our subscriptions so a replaced runtime stops reacting.
+		for (const off of unsubscribes.splice(0)) off();
+		running.clear();
+	});
 
 	pi.on("input", (e: any) => {
 		if (e?.source === "interactive") userInputSeen = true;
@@ -413,14 +421,12 @@ export default function cacheWarmDecay(pi: ExtensionAPI) {
 		lastAction = null;
 	});
 
-	pi.on("agent_settled", (_e, ctx) => {
+	pi.on("agent_settled", () => {
 		settledAt = Date.now();
-		lastCtx = ctx;
 	});
 
 	pi.on("cache_warming_decision", (event, ctx) => {
 		const s = loadSettings();
-		lastCtx = ctx;
 		if (!s.enabled) return;
 		if (event.warmCost <= 0 && event.missCost <= 0) return; // economics unavailable: leave to pi
 
